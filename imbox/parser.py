@@ -78,7 +78,7 @@ def decode_param(param):
                 value = quopri.decodestring(code)
             elif type_ == 'B':
                 value = base64.decodebytes(code.encode())
-            value = str_encode(value, encoding)
+            value = str_encode(value, encoding, errors='ignore')
             value_results.append(value)
             if value_results:
                 v = ''.join(value_results)
@@ -115,7 +115,7 @@ def parse_attachment(message_part):
                     s_name = name.split("*")
                     if s_name[0] == 'filename':
                         # If this is a split file name - use the number after the * as an index to insert this part
-                        if len(s_name) > 1:
+                        if len(s_name) > 1 and s_name[1] != '':
                             filename_parts.insert(int(s_name[1]),value[1:-1] if value.startswith('"') else value)
                         else:
                             filename_parts.insert(0,value[1:-1] if value.startswith('"') else value)
