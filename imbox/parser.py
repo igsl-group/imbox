@@ -132,6 +132,8 @@ def parse_attachment(message_part):
 def decode_content(message):
     content = message.get_payload(decode=True)
     charset = message.get_content_charset('utf-8')
+    if charset is not None and (charset == 'gb2312' or charset == 'GB2312'):
+      return str_decode(content, charset)
     try:
         return content.decode(charset, 'ignore')
     except LookupError:
