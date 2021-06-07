@@ -85,6 +85,14 @@ def decode_param(param):
     logger.debug("Decoded parameter {} - {}".format(name, v))
     return name, v
 
+def decode_bytes_data(data):
+  if isinstance(data, bytes):
+    result = chardet.detect(data)
+    encoding = result['encoding'] if result and result['encoding'] != None else 'UTF-8'
+    encoding = 'GBK' if encoding.lower() == 'gb2312' else encoding
+    return data.decode(encoding=encoding, errors='ignore')
+  else:
+    return data
 
 def parse_attachment(message_part):
     # Check again if this is a valid attachment
@@ -106,24 +114,35 @@ def parse_attachment(message_part):
                 'content-id': message_part.get("Content-ID", None)
             }
             filename = message_part.get_param('name')
-            filename_parts = []
-            for param in dispositions[1:]:
-                if param:
-                    name, value = decode_param(param)
+            if re.compile(r"\=\?GB2312").search(filename) == None:
+              filename_parts = []
+              for param in dispositions[1:]:
+                  if param:
+                      name, value = decode_param(param)
 
-                    # Check for split filename
-                    s_name = name.split("*")
-                    if s_name[0] == 'filename':
-                        # If this is a split file name - use the number after the * as an index to insert this part
-                        if len(s_name) > 1 and s_name[1] != '':
-                            filename_parts.insert(int(s_name[1]),value[1:-1] if value.startswith('"') else value)
-                        else:
-                            filename_parts.insert(0,value[1:-1] if value.startswith('"') else value)
+                      # Check for split filename
+                      s_name = name.split("*")
+                      if s_name[0] == 'filename':
+                          # If this is a split file name - use the number after the * as an index to insert this part
+                          if len(s_name) > 1 and s_name[1] != '':
+                              filename_parts.insert(int(s_name[1]),value[1:-1] if value.startswith('"') else value)
+                          else:
+                              filename_parts.insert(0,value[1:-1] if value.startswith('"') else value)
 
-                    if 'create-date' in name:
-                        attachment['create-date'] = value
+                      if 'create-date' in name:
+                          attachment['create-date'] = value
 
-            attachment['filename'] = "".join(filename_parts)
+              attachment['filename'] = "".join(filename_parts)
+            else:
+              try:
+                headers = decode_header(filename)
+              except email.errors.HeaderParserError:
+                pass
+              else:
+                if len(headers) > 0:
+                  (text, _) = headers[0]
+                  decoded_filename = decode_bytes_data(data=text)
+                  attachment['filename'] = decoded_filename
             return attachment
 
     return None
@@ -132,7 +151,7 @@ def parse_attachment(message_part):
 def decode_content(message):
     content = message.get_payload(decode=True)
     charset = message.get_content_charset('utf-8')
-    if charset is not None and (charset == 'gb2312' or charset == 'GB2312'):
+    if charset is not None and (charset == 'gb2312' or charset == 'GB2312' or charset == 'gbk' or charset == 'GBK'):
       return str_decode(content, charset)
     try:
         return content.decode(charset, 'ignore')
